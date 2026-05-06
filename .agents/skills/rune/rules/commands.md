@@ -24,16 +24,16 @@ export default defineCommand({
 
 ### Properties
 
-| Property      | Type                                | Required | Description                                                                   |
-| ------------- | ----------------------------------- | -------- | ----------------------------------------------------------------------------- |
-| `description` | `string`                            | No       | One-line summary for `--help`                                                 |
-| `args`        | `CommandArgField[]`                 | No       | Positional arguments, in CLI order                                            |
-| `options`     | `CommandOptionField[]`              | No       | Named option flags                                                            |
-| `aliases`     | `readonly string[]`                 | No       | Alternative command names (kebab-case). Root command cannot have aliases      |
-| `examples`    | `readonly string[]`                 | No       | Usage examples for `--help`                                                   |
-| `json`        | `true`                              | No       | Enables the built-in `--json` flag (omit to disable; `false` is not accepted) |
-| `help`        | `(data: CommandHelpData) => string` | No       | Custom renderer for this command's help output                                |
-| `run`         | `(ctx) => void \| Promise<void>`    | Yes      | Command logic. In `json: true` mode it may return structured data             |
+| Property      | Type                                | Required | Description                                                                                                           |
+| ------------- | ----------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `description` | `string`                            | No       | One-line summary for `--help`                                                                                         |
+| `args`        | `CommandArgField[]`                 | No       | Positional arguments, in CLI order                                                                                    |
+| `options`     | `CommandOptionField[]`              | No       | Named option flags                                                                                                    |
+| `aliases`     | `readonly string[]`                 | No       | Alternative command names (kebab-case). Root command cannot have aliases                                              |
+| `examples`    | `readonly string[]`                 | No       | Usage examples for `--help`                                                                                           |
+| `json`        | `true`                              | No       | Enables the built-in `--json` flag (omit to disable; `false` is not accepted)                                         |
+| `help`        | `(data: CommandHelpData) => string` | No       | Custom renderer for this command's help output                                                                        |
+| `run`         | `(ctx) => void \| Promise<void>`    | Yes      | Command logic. In `json: true` mode it may return a structured document; in `jsonl: true` mode it returns an iterable |
 
 ### Custom help rendering
 
@@ -78,6 +78,44 @@ Use global options after the resolved command path, e.g. `my-cli deploy --profil
 
 After changing global options in `rune.config.ts`, run `rune sync` to refresh `.rune/global-options.d.ts` for editor type inference. `rune run` refreshes it before execution, and `rune build` refreshes it and validates global options against command options.
 
+`defineConfig({ locals })` creates project-defined runtime values once per successful executable command invocation and exposes them as `ctx.locals`:
+
+```ts
+export default defineConfig({
+  options: [{ name: "profile", type: "string", default: "prod" }],
+  async locals(ctx) {
+    const workspace = await resolveWorkspace(ctx.cwd);
+
+    return {
+      workspace,
+      api: createApiClient({ profile: ctx.options.profile }),
+    };
+  },
+});
+```
+
+Locals are created after routing and argument parsing succeed, before `beforeRun`. They are not created for help, version, unknown-command, group-help, JSON-help, or parse-failure paths. The locals factory receives parsed `args` / `options`, `cwd`, `rawArgs`, `output`, command metadata, and `outputMode`; global options declared in the same `defineConfig()` call are inferred on `ctx.options`, while command-specific options remain `unknown` keys. It intentionally does not receive `stdin`. Hooks and commands receive the same locals object. After changing locals, run `rune sync` to refresh `.rune/global-locals.d.ts`.
+
+`defineConfig({ hooks })` registers project-wide hooks around each executable command's `run()` lifecycle:
+
+```ts
+export default defineConfig({
+  hooks: {
+    beforeRun(ctx) {
+      ctx.output.error(`running ${ctx.command.path.join(" ")}`);
+    },
+    afterRun(ctx) {
+      ctx.output.error(`completed ${ctx.result.kind}`);
+    },
+    onRunError(ctx) {
+      ctx.output.error(`${ctx.stage} failed: ${ctx.error.message}`);
+    },
+  },
+});
+```
+
+Hooks run only after routing and argument parsing succeed for a leaf command. They do not run for help, version, unknown-command, group-help, JSON-help, or parse-failure paths. Hook `options` include global and command options, and global options declared in the same `defineConfig()` call are inferred on `ctx.options`; hook `options` do not include the framework-injected `json` flag, so use `ctx.outputMode` for the effective stdout mode. Hook context includes `ctx.locals` after locals are created. If locals creation fails, `onRunError` runs with `stage: "locals"` and no `ctx.locals`. Prefer `ctx.output.error()` for hook diagnostics because `ctx.output.log()` writes to stdout for text commands.
+
 Priority order:
 
 1. `defineCommand({ help })`
@@ -100,14 +138,21 @@ This works for commands, groups, and unknown-command suggestions. It does not re
 | --------- | ------------------- | ------------------------------------------------------ |
 | `args`    | `object`            | Parsed positional argument values                      |
 | `options` | `object`            | Parsed option values                                   |
+| `locals`  | `object`            | Project locals from `defineConfig({ locals })`         |
 | `cwd`     | `string`            | Working directory                                      |
 | `rawArgs` | `readonly string[]` | Original unparsed argv tokens                          |
 | `output`  | `CommandOutput`     | `output.log()` for stdout, `output.error()` for stderr |
+| `stdin`   | `CommandStdin`      | Explicit stdin reader (`text()`, `bytes()`)            |
 
 Always use `output.log()` instead of `console.log()`. This allows:
 
 - Capture in tests via `runCommand()`
 - Automatic suppression in `--json` mode so stdout stays machine-readable
+
+Use `ctx.stdin` instead of reading `process.stdin` directly. Reading is explicit:
+check `stdin.isPiped` when needed, then call `await stdin.text()` for UTF-8 text
+or `await stdin.bytes()` for bytes. stdin can be consumed only once; repeated
+reads fail with `kind: "rune/stdin-consumed"`.
 
 ## Field types
 
@@ -251,8 +296,11 @@ Set `json: true` to enable machine-readable output:
 ```ts
 export default defineCommand({
   json: true,
-  run({ output }) {
-    output.log("visible without --json, suppressed with --json");
+  run({ options, output }) {
+    if (!options.json) {
+      output.log("visible without JSON mode");
+    }
+
     return { items: [1, 2, 3] };
   },
 });
@@ -261,6 +309,7 @@ export default defineCommand({
 - **With `--json`**: `output.log()` suppressed, return value printed as a single-line JSON document to stdout (no indentation)
 - **Without `--json`**: `output.log()` works normally, return value is not printed
 - **Under AI agents**: Rune auto-enables JSON mode when it detects an AI agent environment (via std-env's `isAgent`), even without `--json`. CI and shell pipes are unaffected — only known agent environment variables trigger this.
+- **Inside `run()`**: `options.json` is `true` whenever JSON mode is active, including agent auto-activation. Use `rawArgs` if you need to distinguish an explicit `--json` flag.
 - **Opting out**: Set `RUNE_DISABLE_AUTO_JSON=1` (or `true`) to suppress auto-activation under agents. `--json` still enables JSON mode explicitly. Mainly intended for agents developing a Rune CLI that need to inspect human-facing output. Has no effect inside `runCommand()` tests.
 - `output.error()` always writes to stderr regardless of mode
 - `--json` is only recognized before the `--` terminator
@@ -278,6 +327,28 @@ Error output in JSON mode:
   }
 }
 ```
+
+## JSON Lines mode
+
+Set `jsonl: true` when a command's stdout contract is JSON Lines (NDJSON):
+
+```ts
+export default defineCommand({
+  jsonl: true,
+  async *run() {
+    yield { id: "a" };
+    yield { id: "b" };
+  },
+});
+```
+
+- `run()` returns an `Iterable` or `AsyncIterable`; each yielded record is serialized as one compact JSON line
+- `output.log()` is always suppressed; `output.error()` still writes to stderr
+- `jsonl: true` cannot be combined with `json: true`
+- Rune does not add a `--jsonl` flag; use a separate command for a human-readable view
+- Runtime `--json` is rejected for JSON Lines commands, but `--help --json` still returns structured help JSON
+- Downstream broken pipes are treated as normal early stops and do not print errors
+- `runCommand()` exposes records as `result.output.records`
 
 ## File-based routing
 
@@ -378,4 +449,4 @@ Unhandled non-CommandError exceptions are wrapped with `kind: "rune/unexpected"`
 - **Schema validation contract**: use `schema["~standard"].validate(value)`, not library-specific `.parse()` or `.safeParse()`.
 - **Hyphenated arg names**: must follow the same rules as option names — start with a letter, single internal hyphens only.
 - **Field name collisions**: a kebab-case name and its camelCase equivalent cannot coexist (e.g. `dry-run` and `dryRun` in the same command).
-- **Reserved names**: the option name `"help"` and short name `"h"` are reserved by the framework. When `json: true`, the option name `"json"` is also reserved.
+- **Reserved names**: the option name `"help"` and short name `"h"` are reserved by the framework. When `json: true` or `jsonl: true`, the option name `"json"` is also reserved.

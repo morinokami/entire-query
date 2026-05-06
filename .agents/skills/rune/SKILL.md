@@ -1,12 +1,13 @@
 ---
 description: Build CLI applications with Rune, a TypeScript-first, agent-friendly CLI framework that uses file-based command routing. Use this skill when the user is creating, modifying, or testing CLI commands with Rune, or scaffolding a new Rune project with create-rune-app.
 metadata:
-    github-path: skills/rune
-    github-ref: refs/tags/@rune-cli/rune@0.0.44
-    github-repo: https://github.com/morinokami/rune
-    github-tree-sha: 5dc3d749222b7bcc36779a02d75e8fcf12da2d4a
+  github-path: skills/rune
+  github-ref: refs/tags/@rune-cli/rune@0.3.1
+  github-repo: https://github.com/morinokami/rune
+  github-tree-sha: 24e09bef343cb14a5ed346845ee2ca49dddf2a26
 name: rune
 ---
+
 # Rune
 
 Use this skill whenever you are working with Rune, an agent-friendly CLI framework for TypeScript where the directory structure under `src/commands/` maps directly to the CLI's command tree.

@@ -19,10 +19,10 @@ async function runCommand(
   command: DefinedCommand,
   argv?: string[],
   context?: RunCommandContext,
-): Promise<CommandExecutionResult<TCommandData>>;
+): Promise<CommandExecutionResult<TCommandDocument, TCommandRecord>>;
 ```
 
-`TCommandData` is inferred from the passed command: it matches the `run()` return type for `json: true` commands and is `undefined` otherwise.
+The output shape is inferred from the passed command: text commands return `output.kind === "text"`, `json: true` commands expose the `run()` return type through `output.document`, and `jsonl: true` commands expose yielded records through `output.records`.
 
 The `argv` parameter accepts the same CLI tokens a user would type. Option parsing, type coercion, schema validation, env fallback resolution, required/default handling, duplicate detection, and `multiple: true` repeated-option collection all run exactly as in a real invocation.
 
@@ -30,13 +30,13 @@ Top-level CLI behavior (command routing, help rendering) is **not** included. `r
 
 ## CommandExecutionResult
 
-| Property   | Type                          | Description                                                           |
-| ---------- | ----------------------------- | --------------------------------------------------------------------- |
-| `exitCode` | `number`                      | `0` for success, non-zero for failure                                 |
-| `stdout`   | `string`                      | Captured `output.log()` output                                        |
-| `stderr`   | `string`                      | Captured `output.error()` output and error messages                   |
-| `error`    | `CommandFailure \| undefined` | Structured error (`kind`, `message`, `hint?`, `details?`, `exitCode`) |
-| `data`     | `TCommandData \| undefined`   | Return value from `run()` when `json: true`, inferred from `run()`    |
+| Property   | Type                          | Description                                                                       |
+| ---------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| `exitCode` | `number`                      | `0` for success, non-zero for failure                                             |
+| `stdout`   | `string`                      | Captured `output.log()` output                                                    |
+| `stderr`   | `string`                      | Captured `output.error()` output and error messages                               |
+| `error`    | `CommandFailure \| undefined` | Structured error (`kind`, `message`, `hint?`, `details?`, `exitCode`)             |
+| `output`   | discriminated union           | `{ kind: "text" }`, `{ kind: "json"; document }`, or `{ kind: "jsonl"; records }` |
 
 ## Testing patterns
 
@@ -104,31 +104,50 @@ const command = defineCommand({
   },
 });
 
-test("returns structured data with --json", async () => {
+test("returns structured document with --json", async () => {
   const result = await runCommand(command, ["--json"]);
 
-  // result.data is typed as { items: number[] } | undefined
+  // result.output.document is typed as { items: number[] } | undefined
   expect(result.stdout).toBe("");
-  expect(result.data).toEqual({ items: [1, 2, 3] });
+  expect(result.output.document).toEqual({ items: [1, 2, 3] });
 });
 
-test("data is populated even without --json", async () => {
+test("document is populated even without --json", async () => {
   const result = await runCommand(command);
 
   expect(result.stdout).toBe("suppressed with --json\n");
-  expect(result.data).toEqual({ items: [1, 2, 3] });
+  expect(result.output.document).toEqual({ items: [1, 2, 3] });
 });
 ```
 
-`result.data` is populated regardless of `--json`. The flag controls only whether `output.log()` is suppressed.
+`result.output.document` is populated regardless of `--json`. The flag controls only whether `output.log()` is suppressed and whether `options.json` is `true` inside `run()`.
 
-At real CLI invocation, Rune auto-enables JSON mode under AI agents even without `--json`. `runCommand()` disables this auto-detection by default (`simulateAgent: false`) so test outcomes do not depend on the host environment. The `RUNE_DISABLE_AUTO_JSON` environment variable that opts out of auto-activation in real CLI runs has no effect here either — `simulateAgent` is the only signal `runCommand()` uses. Pass `{ simulateAgent: true }` as the third argument when you specifically want to exercise the agent auto-enable path:
+At real CLI invocation, Rune auto-enables JSON mode under AI agents even without `--json`; this also makes `options.json` true inside `run()`. `runCommand()` disables this auto-detection by default (`simulateAgent: false`) so test outcomes do not depend on the host environment. The `RUNE_DISABLE_AUTO_JSON` environment variable that opts out of auto-activation in real CLI runs has no effect here either — `simulateAgent` is the only signal `runCommand()` uses. Pass `{ simulateAgent: true }` as the third argument when you specifically want to exercise the agent auto-enable path:
 
 ```ts
 const result = await runCommand(command, [], { simulateAgent: true });
 
 expect(result.stdout).toBe("");
-expect(result.data).toEqual({ items: [1, 2, 3] });
+expect(result.output.document).toEqual({ items: [1, 2, 3] });
+```
+
+### JSON Lines mode
+
+For `jsonl: true` commands, `runCommand()` captures the raw JSON Lines stdout and the yielded records:
+
+```ts
+const command = defineCommand({
+  jsonl: true,
+  async *run() {
+    yield { id: "a" };
+    yield { id: "b" };
+  },
+});
+
+const result = await runCommand(command);
+
+expect(result.stdout).toBe('{"id":"a"}\n{"id":"b"}\n');
+expect(result.output.records).toEqual([{ id: "a" }, { id: "b" }]);
 ```
 
 ### Validation errors
@@ -167,7 +186,7 @@ test("uses injected cwd", async () => {
 });
 ```
 
-Inject env values for options that declare `env`. The provided env map replaces `process.env` for that command test; it is not merged automatically and defaults to an empty map.
+Inject env values for options that declare `env`. The provided env map replaces `process.env` for that command test; it is not merged automatically and defaults to an empty map so tests stay isolated from the host environment.
 
 ```ts
 const command = defineCommand({
@@ -184,9 +203,24 @@ test("uses injected env", async () => {
 });
 ```
 
+If you intentionally want to inherit the current process environment, merge it explicitly:
+
+```ts
+const result = await runCommand(command, [], {
+  env: { ...process.env, PORT: "4000" },
+});
+```
+
+Inject stdin with the `stdin` context field. This feeds `ctx.stdin` without
+touching `process.stdin`; omitted stdin is an isolated empty TTY-like input.
+
+```ts
+const result = await runCommand(command, [], { stdin: "hello\n" });
+```
+
 ### Global options
 
-When a project defines global options with `defineConfig({ options })`, create a project-aware helper with `createRunCommand(config)` and use it like `runCommand()`:
+When a project defines global options, hooks, or locals with `defineConfig()`, create a project-aware helper with `createRunCommand(config)` and use it like `runCommand()`:
 
 ```ts
 import { createRunCommand } from "@rune-cli/rune/test";
@@ -203,4 +237,22 @@ test("uses the configured profile", async () => {
 });
 ```
 
-This injects `config.options` into each command test so parsing and validation match the real CLI. `RunCommandContext.globalOptions` exists as a low-level escape hatch, but normal project tests should prefer `createRunCommand(config)`.
+This injects `config.options`, `config.hooks`, and `config.locals` into each command test so parsing, validation, project hooks, and project locals match the real CLI. `RunCommandContext.globalOptions`, `RunCommandContext.globalHooks`, `RunCommandContext.createLocals`, and `RunCommandContext.locals` exist as low-level escape hatches and override the config-provided values for a specific test, but normal project tests should prefer `createRunCommand(config)`.
+
+For tests that only need a fixed locals object, pass `locals`:
+
+```ts
+const result = await runCommand(command, [], {
+  locals: { workspace: fakeWorkspace, api: fakeApi },
+});
+```
+
+Use `createLocals` when the test needs to assert or depend on the locals factory context. Do not pass both `locals` and `createLocals`.
+
+When testing a hook that depends on route metadata, pass `commandMetadata` explicitly. `runCommand()` does not perform manifest routing and otherwise uses empty metadata:
+
+```ts
+const result = await runCommand(command, [], {
+  commandMetadata: { cliName: "my-cli", path: ["deploy"], name: "deploy" },
+});
+```

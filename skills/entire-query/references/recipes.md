@@ -2,6 +2,8 @@
 
 Recipes beyond the four inline in `SKILL.md`. Each is a compose-from-primitives pattern: `eq` provides raw data, `jq` does the aggregation. Adapt freely.
 
+> Recipes write `eq …` for readability. The skill's default invocation is `npx -y entire-query …` (no install required). Either run the detection block from `SKILL.md` once and then use `$EQ` in place of `eq`, or substitute `npx -y entire-query` directly. Do not run a bare `eq …` without first confirming `command -v eq` succeeds.
+
 ## Cost / token consumption
 
 ### Top N most expensive sessions in a branch
@@ -11,7 +13,7 @@ git log --format='%H' <BRANCH> \
   | xargs -n1 git show --format='%(trailers:key=Entire-Checkpoint,valueonly)' --no-patch \
   | sort -u | grep -v '^$' \
   | while read CKPT; do
-      eq session list "$CKPT" --jsonl \
+      eq session list "$CKPT" \
         | jq -c --arg c "$CKPT" '. + {checkpoint_id:$c}'
     done \
   | while read S; do
@@ -35,7 +37,7 @@ eq session get <ckpt> --index <n> --json \
 ### Cumulative cost for a file
 
 ```bash
-eq checkpoint list --file <path> --jsonl \
+eq checkpoint list --file <path> \
   | jq -s '{
       input:          map(.token_usage.input_tokens)          | add,
       output:         map(.token_usage.output_tokens)         | add,
@@ -50,8 +52,8 @@ eq checkpoint list --file <path> --jsonl \
 ### AI-vs-human ratio at the moment a file was last touched
 
 ```bash
-LATEST=$(eq checkpoint list --file <path> --jsonl | jq -s 'sort_by(.created_at) | last | .checkpoint_id' -r)
-eq session list "$LATEST" --file <path> --jsonl \
+LATEST=$(eq checkpoint list --file <path> | jq -s 'sort_by(.created_at) | last | .checkpoint_id' -r)
+eq session list "$LATEST" --file <path> \
   | while read S; do
       eq session get "$LATEST" --index "$(echo "$S" | jq .index)" --json
     done \
@@ -70,8 +72,8 @@ Always caveat: `initial_attribution` is the snapshot at session start, not a cur
 Heuristic: high `human_modified`, low `agent_percentage`. Often signals "agent got it wrong, human fixed it".
 
 ```bash
-eq checkpoint list --jsonl | jq -r .checkpoint_id | while read CKPT; do
-  eq session list "$CKPT" --jsonl | jq -r .index | while read IDX; do
+eq checkpoint list | jq -r .checkpoint_id | while read CKPT; do
+  eq session list "$CKPT" | jq -r .index | while read IDX; do
     eq session get "$CKPT" --index "$IDX" --json
   done
 done | jq -s 'map(select(.initial_attribution.human_modified > 50 and .initial_attribution.agent_percentage < 30))
@@ -86,8 +88,8 @@ Two passes: detect intent in prompts, then verify actual invocation in transcrip
 
 ```bash
 # Pass 1: prompts that mention the trigger domain (e.g. "review")
-eq checkpoint list --jsonl | jq -r .checkpoint_id | while read CKPT; do
-  eq session list "$CKPT" --jsonl \
+eq checkpoint list | jq -r .checkpoint_id | while read CKPT; do
+  eq session list "$CKPT" \
     | jq -c --arg c "$CKPT" '. + {checkpoint_id:$c}'
 done | jq -c 'select(.prompt_preview | test("レビュー|review"; "i"))' > candidates.jsonl
 
@@ -95,7 +97,7 @@ done | jq -c 'select(.prompt_preview | test("レビュー|review"; "i"))' > cand
 while read S; do
   CKPT=$(echo "$S" | jq -r .checkpoint_id)
   IDX=$(echo "$S" | jq .index)
-  HIT=$(eq transcript "$CKPT" --session "$IDX" --jsonl \
+  HIT=$(eq transcript "$CKPT" --session "$IDX" \
         | jq -s 'any(.text // ""; test(".claude/skills/reviewer"))')
   echo "$S" | jq --argjson hit "$HIT" '. + {skill_invoked: $hit}'
 done < candidates.jsonl | jq -s 'group_by(.skill_invoked) | map({invoked: .[0].skill_invoked, count: length})'
@@ -108,21 +110,21 @@ Report false negatives by name (`checkpoint_id`/`session_index`) — those are t
 ### All Bash commands ever executed in a session
 
 ```bash
-eq transcript <ckpt> --session <n> --jsonl \
+eq transcript <ckpt> --session <n> \
   | jq -r 'select(.kind=="tool" and .subtype=="bash") | .text'
 ```
 
 For Claude Code transcripts where the structured tool call is in `raw.message.content[]`:
 
 ```bash
-eq transcript <ckpt> --session <n> --jsonl \
+eq transcript <ckpt> --session <n> \
   | jq -r '.raw.message.content[]? | select(.type=="tool_use" and .name=="Bash") | .input.command'
 ```
 
 ### Tool histogram for a session
 
 ```bash
-eq transcript <ckpt> --session <n> --jsonl \
+eq transcript <ckpt> --session <n> \
   | jq -r '.raw.message.content[]? | select(.type=="tool_use") | .name' \
   | sort | uniq -c | sort -rn
 ```
@@ -130,7 +132,7 @@ eq transcript <ckpt> --session <n> --jsonl \
 ### Did the session spawn subagents?
 
 ```bash
-eq transcript <ckpt> --session <n> --jsonl \
+eq transcript <ckpt> --session <n> \
   | jq 'select(.raw.message.content[]? | select(.type=="tool_use" and .name=="Task")) | {event_index, subagent: .raw.message.content[] | select(.type=="tool_use" and .name=="Task") | .input.subagent_type}'
 ```
 
@@ -139,10 +141,10 @@ eq transcript <ckpt> --session <n> --jsonl \
 ### All sessions that ever touched a file, time-ordered
 
 ```bash
-eq checkpoint list --file <path> --jsonl \
+eq checkpoint list --file <path> \
   | jq -r .checkpoint_id \
   | while read CKPT; do
-      eq session list "$CKPT" --file <path> --jsonl \
+      eq session list "$CKPT" --file <path> \
         | jq -c --arg c "$CKPT" '. + {checkpoint_id:$c}'
     done \
   | jq -s 'sort_by(.created_at) | map({checkpoint_id, index, agent, created_at, prompt_preview})'
@@ -161,7 +163,7 @@ echo "=== Original prompt ==="
 eq prompt <ckpt> --session <n> --json | jq -r .prompt
 echo
 echo "=== Files the agent read ==="
-eq transcript <ckpt> --session <n> --jsonl \
+eq transcript <ckpt> --session <n> \
   | jq -r '.raw.message.content[]? | select(.type=="tool_use" and .name=="Read") | .input.file_path' \
   | sort -u
 ```

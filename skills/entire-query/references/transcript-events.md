@@ -1,6 +1,6 @@
 # Transcript event interpretation
 
-Load when you need to extract structured info from `eq transcript` output beyond the normalized fields. The normalized `text` / `kind` / `subtype` are conservative; the original payload is in `raw`.
+How to extract structured info from `eq transcript` output beyond the normalized fields. The normalized `text` / `kind` / `subtype` are conservative; the original payload is in `raw`.
 
 ## Two dialects
 
@@ -69,16 +69,16 @@ select(.raw.message.content?)
 
 These appear interleaved and have no `role`. `eq transcript` normalizes them to `role: "unknown"`.
 
-| `raw.type` | What it is | What to do |
-|---|---|---|
-| `file-history-snapshot` | Tracked-file backup snapshot | skip |
-| `progress` (with `data.type == "hook_progress"`) | Hook execution progress | skip |
-| `system` | Internal system event | skip unless debugging |
+| `raw.type`                                       | What it is                   | What to do            |
+| ------------------------------------------------ | ---------------------------- | --------------------- |
+| `file-history-snapshot`                          | Tracked-file backup snapshot | skip                  |
+| `progress` (with `data.type == "hook_progress"`) | Hook execution progress      | skip                  |
+| `system`                                         | Internal system event        | skip unless debugging |
 
 Filter at the source:
 
 ```bash
-eq transcript ... --jsonl | jq 'select(.role != "unknown")'
+eq transcript ... | jq 'select(.role != "unknown")'
 ```
 
 Or use `--role assistant|user|tool` which already excludes them.
