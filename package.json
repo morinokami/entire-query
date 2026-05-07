@@ -1,6 +1,6 @@
 {
   "name": "entire-query",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Entire Query — fetch Entire AI session history as JSON/JSONL",
   "license": "MIT",
   "bin": {
