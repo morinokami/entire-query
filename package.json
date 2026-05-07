@@ -17,6 +17,8 @@
     "rune": "rune"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
     "@rune-cli/rune": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
