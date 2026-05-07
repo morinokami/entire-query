@@ -86,6 +86,13 @@ export function buildFixture(): Fixture {
         cache_read_tokens: 30,
         output_tokens: 40,
         api_call_count: 4,
+        subagent_tokens: {
+          input_tokens: 5,
+          cache_creation_tokens: 1000,
+          cache_read_tokens: 2000,
+          output_tokens: 80,
+          api_call_count: 1,
+        },
       },
       session_metrics: {
         turn_count: 7,

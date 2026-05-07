@@ -111,6 +111,33 @@ describe("eq session get", () => {
     }
   });
 
+  test("token_usage.subagent_tokens is surfaced when present, null otherwise", async () => {
+    const r0 = await runEq(sessionGet, [FIXTURE_CHECKPOINT_ID, "--index", "0", "--repo", fx.root]);
+    expect(r0.exitCode).toBe(0);
+    expect(r0.output).toMatchObject({
+      kind: "json",
+      document: {
+        token_usage: {
+          api_call_count: 4,
+          subagent_tokens: {
+            input_tokens: 5,
+            cache_creation_tokens: 1000,
+            cache_read_tokens: 2000,
+            output_tokens: 80,
+            api_call_count: 1,
+            subagent_tokens: null,
+          },
+        },
+      },
+    });
+
+    const r1 = await runEq(sessionGet, [FIXTURE_CHECKPOINT_ID, "--index", "1", "--repo", fx.root]);
+    expect(r1.output).toMatchObject({
+      kind: "json",
+      document: { token_usage: { subagent_tokens: null } },
+    });
+  });
+
   test("session_metrics falls back to api_call_count when not reported", async () => {
     const r = await runEq(sessionGet, [FIXTURE_CHECKPOINT_ID, "--index", "1", "--repo", fx.root]);
     expect(r.exitCode).toBe(0);
