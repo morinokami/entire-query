@@ -6,6 +6,10 @@ export interface TokenUsage {
   cache_read_tokens: number;
   output_tokens: number;
   api_call_count: number;
+  // Token usage from spawned subagents (Claude Code Task tool, etc.). Recursive
+  // because a subagent can itself spawn further subagents. `null` when the
+  // session/checkpoint did not spawn any subagents.
+  subagent_tokens: TokenUsage | null;
 }
 
 export interface InitialAttribution {
@@ -109,4 +113,21 @@ export const ZERO_TOKEN_USAGE: TokenUsage = {
   cache_read_tokens: 0,
   output_tokens: 0,
   api_call_count: 0,
+  subagent_tokens: null,
 };
+
+// Recursively normalize a raw token_usage block. The shape is identical at
+// every level (TokenUsage references itself via subagent_tokens), so the same
+// helper handles top-level checkpoint/session usage and any nested subagent
+// totals.
+export function normalizeTokenUsage(raw: Partial<TokenUsage> | undefined | null): TokenUsage {
+  if (!raw) return { ...ZERO_TOKEN_USAGE };
+  return {
+    input_tokens: raw.input_tokens ?? 0,
+    cache_creation_tokens: raw.cache_creation_tokens ?? 0,
+    cache_read_tokens: raw.cache_read_tokens ?? 0,
+    output_tokens: raw.output_tokens ?? 0,
+    api_call_count: raw.api_call_count ?? 0,
+    subagent_tokens: raw.subagent_tokens ? normalizeTokenUsage(raw.subagent_tokens) : null,
+  };
+}

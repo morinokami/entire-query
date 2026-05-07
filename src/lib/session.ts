@@ -5,11 +5,11 @@ import { assertCheckpointId, checkpointDir, stripLeadingSlash } from "./paths.ts
 import { buildPromptPreview, loadPrompts } from "./prompt.ts";
 import {
   type InitialAttribution,
+  normalizeTokenUsage,
   type Session,
   type SessionMetrics,
   type SessionSummary,
   type TokenUsage,
-  ZERO_TOKEN_USAGE,
 } from "./types.ts";
 
 interface RawSessionMetadata {
@@ -28,17 +28,6 @@ interface RawSessionMetadata {
   token_usage?: Partial<TokenUsage>;
   initial_attribution?: Partial<InitialAttribution>;
   session_metrics?: Partial<SessionMetrics>;
-}
-
-function normalizeTokenUsage(raw: Partial<TokenUsage> | undefined): TokenUsage {
-  if (!raw) return { ...ZERO_TOKEN_USAGE };
-  return {
-    input_tokens: raw.input_tokens ?? 0,
-    cache_creation_tokens: raw.cache_creation_tokens ?? 0,
-    cache_read_tokens: raw.cache_read_tokens ?? 0,
-    output_tokens: raw.output_tokens ?? 0,
-    api_call_count: raw.api_call_count ?? 0,
-  };
 }
 
 // Resolve session metrics from raw metadata, falling back to api_call_count

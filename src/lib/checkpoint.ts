@@ -4,8 +4,8 @@ import { assertCheckpointId, checkpointDir, stripLeadingSlash } from "./paths.ts
 import {
   type Checkpoint,
   type CheckpointSessionRef,
+  normalizeTokenUsage,
   type TokenUsage,
-  ZERO_TOKEN_USAGE,
 } from "./types.ts";
 
 interface RawCheckpointMetadata {
@@ -21,17 +21,6 @@ interface RawCheckpointMetadata {
 
 interface RawSessionMetadata {
   session_id?: string;
-}
-
-function normalizeTokenUsage(raw: Partial<TokenUsage> | undefined): TokenUsage {
-  if (!raw) return { ...ZERO_TOKEN_USAGE };
-  return {
-    input_tokens: raw.input_tokens ?? 0,
-    cache_creation_tokens: raw.cache_creation_tokens ?? 0,
-    cache_read_tokens: raw.cache_read_tokens ?? 0,
-    output_tokens: raw.output_tokens ?? 0,
-    api_call_count: raw.api_call_count ?? 0,
-  };
 }
 
 function indexFromMetadataPath(p: string): number | null {
