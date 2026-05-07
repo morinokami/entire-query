@@ -6,6 +6,8 @@ Recipes beyond the four inline in `SKILL.md`. Each is a compose-from-primitives 
 
 ## Cost / token consumption
 
+> **Subagents:** `token_usage.subagent_tokens` is recursive — Claude Code Task-tool work lives there. The recipes below sum the **top-level** `token_usage` only, which under-counts whenever subagents ran. For accuracy, swap `.token_usage.<field>` with the recursive walker: `def walk_tu: if . == null then empty else ., (.subagent_tokens | walk_tu) end;` and aggregate over `[.token_usage | walk_tu]`. See the cost recipe in `SKILL.md` for the full pattern.
+
 ### Top N most expensive sessions in a branch
 
 ```bash
@@ -22,7 +24,7 @@ git log --format='%H' <BRANCH> \
       eq session get "$CKPT" --index "$IDX" --json
     done \
   | jq -s 'sort_by(-(.token_usage.input_tokens + .token_usage.output_tokens + .token_usage.cache_creation_tokens))[:10]
-           | map({checkpoint_id, index, agent, prompt: (.token_usage), files_touched})'
+           | map({checkpoint_id, index, agent, token_usage, files_touched})'
 ```
 
 Report `input + output + cache_creation` as the cost-relevant total. `cache_read` is near-free; do not double-count.
@@ -159,8 +161,8 @@ Heuristic only. Look at the file's checkpoint list and flag clusters within 24h 
 Extract a re-runnable prompt + the key files the session read:
 
 ```bash
-echo "=== Original prompt ==="
-eq prompt <ckpt> --session <n> --json | jq -r .prompt
+echo "=== Original prompt(s) ==="
+eq prompt <ckpt> --session <n> --json | jq -r '.prompts // [] | join("\n\n---\n\n")'
 echo
 echo "=== Files the agent read ==="
 eq transcript <ckpt> --session <n> \
@@ -177,8 +179,8 @@ Hand this off as a "starter pack" — the human can replay the prompt against a 
 ```bash
 A=<ckpt-1>; B=<ckpt-2>
 diff \
-  <(eq prompt "$A" --session 0 --json | jq -r .prompt) \
-  <(eq prompt "$B" --session 0 --json | jq -r .prompt)
+  <(eq prompt "$A" --session 0 --json | jq -r '.prompts // [] | .[0] // ""') \
+  <(eq prompt "$B" --session 0 --json | jq -r '.prompts // [] | .[0] // ""')
 ```
 
 For deeper comparison, compare the `tool_use` name+input lists rather than free transcripts.

@@ -36,38 +36,33 @@ describe("eq checkpoint", () => {
     for (const s of r.output.document!.sessions) expect(s.path.startsWith("/")).toBe(false);
   });
 
-  test("invalid id format → invalid-arguments", async () => {
-    const r = await runEq(checkpoint, ["zzz", "--repo", fx.root]);
-    expect(r.exitCode).not.toBe(0);
-    expect(r.error?.kind).toBe("invalid-arguments");
-  });
-
-  test("unknown id → checkpoint/not-found", async () => {
+  test("unknown 12-hex id → checkpoint/not-found", async () => {
     const r = await runEq(checkpoint, ["999999999999", "--repo", fx.root]);
     expect(r.error?.kind).toBe("checkpoint/not-found");
   });
 
-  test("--commit resolves via Entire-Checkpoint trailer", async () => {
-    const r = await runEq(checkpoint, ["--commit", fx.appCommit, "--repo", fx.root]);
+  test("commit SHA with Entire-Checkpoint trailer is resolved", async () => {
+    const r = await runEq(checkpoint, [fx.appCommit, "--repo", fx.root]);
     expect(r.exitCode).toBe(0);
     if (r.output.kind !== "json") throw new Error("expected json output");
     expect(r.output.document?.checkpoint_id).toBe(FIXTURE_CHECKPOINT_ID);
   });
 
-  test("--commit on a commit without trailer → checkpoint/not-found", async () => {
-    const r = await runEq(checkpoint, ["--commit", "main~1", "--repo", fx.root]);
+  test("named ref (HEAD) with trailer is resolved", async () => {
+    const r = await runEq(checkpoint, ["HEAD", "--repo", fx.root]);
+    expect(r.exitCode).toBe(0);
+    if (r.output.kind !== "json") throw new Error("expected json output");
+    expect(r.output.document?.checkpoint_id).toBe(FIXTURE_CHECKPOINT_ID);
+  });
+
+  test("commit without trailer → checkpoint/not-found", async () => {
+    const r = await runEq(checkpoint, ["main~1", "--repo", fx.root]);
     expect(r.error?.kind).toBe("checkpoint/not-found");
   });
 
-  test("id and --commit together → invalid-arguments", async () => {
-    const r = await runEq(checkpoint, [
-      FIXTURE_CHECKPOINT_ID,
-      "--commit",
-      fx.appCommit,
-      "--repo",
-      fx.root,
-    ]);
-    expect(r.error?.kind).toBe("invalid-arguments");
+  test("garbage ref (neither id nor valid git ref) → checkpoint/not-found", async () => {
+    const r = await runEq(checkpoint, ["zzz", "--repo", fx.root]);
+    expect(r.error?.kind).toBe("checkpoint/not-found");
   });
 
   test("missing entire branch → entire/branch-not-found", async () => {

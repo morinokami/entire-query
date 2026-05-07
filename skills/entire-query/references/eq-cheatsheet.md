@@ -10,24 +10,26 @@ Reference for the `eq` CLI. The npm package is `entire-query`. **Default invocat
 
 ## Output modes
 
-| Command                                 | Mode  | Stdout              |
-| --------------------------------------- | ----- | ------------------- |
-| `eq checkpoint <id>` / `--commit <sha>` | JSON  | one document        |
-| `eq checkpoint list`                    | JSONL | one record per line |
-| `eq session list`                       | JSONL | one record per line |
-| `eq session get`                        | JSON  | one document        |
-| `eq prompt`                             | JSON  | one document        |
-| `eq transcript`                         | JSONL | one event per line  |
+| Command               | Mode  | Stdout              |
+| --------------------- | ----- | ------------------- |
+| `eq checkpoint <ref>` | JSON  | one document        |
+| `eq checkpoint list`  | JSONL | one record per line |
+| `eq session list`     | JSONL | one record per line |
+| `eq session get`      | JSON  | one document        |
+| `eq prompt`           | JSON  | one document        |
+| `eq transcript`       | JSONL | one event per line  |
 
 ## Commands
 
-### `eq checkpoint <id>`
+### `eq checkpoint <ref>`
 
-Returns `Checkpoint` JSON for a single checkpoint id (12 hex chars).
+`<ref>` is **polymorphic**: a 12-hex string is treated as a checkpoint id; anything else is resolved as a git ref (commit SHA / branch / tag / `HEAD`) via the `Entire-Checkpoint:` trailer. Returns `Checkpoint` JSON either way. Errors with `kind: "checkpoint/not-found"` if the id is unknown, the ref is unresolvable, or the commit has no trailer.
 
-### `eq checkpoint --commit <sha>`
-
-Resolves the `Entire-Checkpoint:` trailer on the commit and returns the same `Checkpoint` JSON. Errors with `kind: "checkpoint/not-found"` if no trailer or no matching checkpoint.
+```bash
+eq checkpoint 04c6b0cd0999
+eq checkpoint <commit-sha>
+eq checkpoint HEAD
+```
 
 ### `eq checkpoint list [--file <path>]`
 
@@ -39,20 +41,31 @@ Streams `SessionSummary` records as NDJSON (one per line) for sessions under the
 
 - `index` — session index in the checkpoint (0, 1, ...)
 - `session_id` — UUID
-- `agent` — e.g. `"Claude Code"`, `"Cursor"`
+- `agent` — e.g. `"Claude Code"`, `"Cursor"`, `"OpenCode"`, `"Codex"`, `"Copilot CLI"`, `"Gemini CLI"`, `"Factory AI Droid"`
 - `model` — string or null
 - `created_at` — ISO 8601
-- `turn_count` — derived from `token_usage.api_call_count`
+- `turn_count` — `session_metrics.turn_count` from the agent's hooks if reported, otherwise falls back to `token_usage.api_call_count`
 - `path` — branch-relative path to the session dir
-- `prompt_preview` — first ~200 chars of `prompt.txt`
+- `prompt_preview` — first ~200 chars of `prompt.txt`'s **first prompt** (prompt.txt may concatenate multiple turns separated by `\n\n---\n\n`; only the first is used for the preview)
 
 ### `eq session get <checkpoint-id> --index <n>`
 
-Returns full `Session` JSON: schema fields are checkpoint-level metadata + session-level `token_usage`, `initial_attribution`, `turn_id`, `transcript_identifier_at_start`, and `files` (paths to metadata/transcript/context/content_hash/prompt).
+Returns full `Session` JSON: checkpoint-level metadata + session-level `token_usage`, `session_metrics`, `initial_attribution`, `turn_id`, `transcript_identifier_at_start`, and `files` (paths to metadata/transcript/context/content_hash/prompt). `session_metrics` carries `turn_count` / `duration_ms` / `context_tokens` / `context_window_size` (each `null` when the agent does not report it; `turn_count` falls back to `api_call_count`). `token_usage.subagent_tokens` is recursive (Claude Code Task tool etc.); `null` when no subagents.
 
 ### `eq prompt <checkpoint-id> --session <n>`
 
-Returns `prompt.txt` as a JSON string `{ "checkpoint_id": "...", "session_index": n, "session_id": "...", "prompt": "..." }`. Use this before opening a transcript.
+Returns `prompt.txt` split on the Entire turn separator (`\n\n---\n\n`):
+
+```json
+{
+  "checkpoint_id": "...",
+  "session_index": 0,
+  "session_id": "...",
+  "prompts": ["first turn prompt", "second turn prompt"]
+}
+```
+
+`prompts` is `null` when `prompt.txt` does not exist, `[]` when it exists but is empty. Use this before opening a transcript — often the prompt list alone answers the question.
 
 ### `eq transcript <checkpoint-id> --session <n>`
 

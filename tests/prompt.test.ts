@@ -20,10 +20,7 @@ describe("eq prompt", () => {
         checkpoint_id: FIXTURE_CHECKPOINT_ID,
         session_index: 0,
         session_id: "11111111-1111-1111-1111-111111111111",
-        prompts: [
-          "Please review src/foo.ts thoroughly.",
-          "Also add a unit test for it.",
-        ],
+        prompts: ["Please review src/foo.ts thoroughly.", "Also add a unit test for it."],
       },
     });
   });
