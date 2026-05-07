@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import checkpoint from "../src/commands/checkpoint/index.ts";
 import checkpointList from "../src/commands/checkpoint/list.ts";
