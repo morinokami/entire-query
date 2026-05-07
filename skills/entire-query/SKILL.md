@@ -23,7 +23,7 @@ Optional: if `eq` is already on `PATH` (the user has done `npm i -g entire-query
 command -v eq >/dev/null 2>&1 && EQ="eq" || EQ="npx -y entire-query"
 ```
 
-Then prefix invocations with `$EQ` (e.g. `$EQ checkpoint --commit <sha>`). Examples below write `eq …` for brevity — substitute `$EQ` (or `npx -y entire-query` directly) in your actual commands. **Do not run a bare `eq …` without first verifying that `command -v eq` succeeds**; on a fresh machine it will fail with `command not found` and you'll have to redo the call with `npx -y entire-query …`.
+Then prefix invocations with `$EQ` (e.g. `$EQ checkpoint <sha>`). Examples below write `eq …` for brevity — substitute `$EQ` (or `npx -y entire-query` directly) in your actual commands. **Do not run a bare `eq …` without first verifying that `command -v eq` succeeds**; on a fresh machine it will fail with `command not found` and you'll have to redo the call with `npx -y entire-query …`.
 
 Pitfall: `npx eq` (without `entire-query`) fetches an unrelated package of the same name. The package name is **always** `entire-query`.
 
@@ -55,7 +55,7 @@ If that prints "no entire history", say so and stop. Do not fabricate.
 Every question follows this shape. Skip steps that are irrelevant.
 
 1. **Anchor**: turn the user's question into one of `commit SHA`, `file path`, `file:line`, or free text
-2. **Resolve to checkpoint(s)**: use `eq checkpoint --commit` (best), or `eq checkpoint list --file <path>` (file-anchored), or `eq checkpoint list` + filter (free text)
+2. **Resolve to checkpoint(s)**: use `eq checkpoint <sha>` (best — accepts any git ref), or `eq checkpoint list --file <path>` (file-anchored), or `eq checkpoint list` + filter (free text)
 3. **Triage sessions cheaply**: `eq session list <id>` returns `agent`, `created_at`, `turn_count`, `prompt_preview`, `files_touched`. Pick the smallest plausible set before opening any transcript
 4. **Read prompt before transcript**: `eq prompt <id> --session <n>` is one short file. Often it answers the question on its own
 5. **Open transcripts last** and filtered: `eq transcript <id> --session <n> --role user|assistant|tool` (NDJSON, pipe to `jq` for analytics)
@@ -67,10 +67,10 @@ Every question follows this shape. Skip steps that are irrelevant.
 
 | User input contains                | First move                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------- |
-| commit SHA / `git blame` mentions  | `eq checkpoint --commit <sha>`                                                        |
+| commit SHA / `git blame` mentions  | `eq checkpoint <sha>`                                                                 |
 | file path / `path:line`            | `eq checkpoint list --file <path>` then triage by `created_at`                        |
 | feature name, free text            | `eq checkpoint list \| jq 'select(.files_touched[] \| contains("..."))'`              |
-| "PR" / "this branch"               | `git log --grep='Entire-Checkpoint:' <range>` → trailer → `eq checkpoint --commit`    |
+| "PR" / "this branch"               | `git log --grep='Entire-Checkpoint:' <range>` → trailer → `eq checkpoint <sha>`       |
 | Token / cost question              | Anchor as above, then aggregate via `\| jq -s` (see [recipes](references/recipes.md)) |
 | "Did skill X fire?" / "Bash audit" | Anchor → `eq transcript ... \| jq` filter (see [recipes](references/recipes.md))      |
 
@@ -86,10 +86,10 @@ JSONL commands have **no `--jsonl` flag** — NDJSON is their only output. Pipe 
 See [eq-cheatsheet.md](references/eq-cheatsheet.md) for the full reference. The five you'll reach for most:
 
 ```bash
-eq checkpoint --commit <sha>                  # → one Checkpoint JSON document
+eq checkpoint <sha-or-id>                     # → one Checkpoint JSON document (polymorphic ref)
 eq checkpoint list --file <path>              # → NDJSON of Checkpoints touching <path>
 eq session list <checkpoint-id>               # → NDJSON of SessionSummary (with prompt_preview)
-eq prompt <checkpoint-id> --session <n>       # → one prompt JSON document
+eq prompt <checkpoint-id> --session <n>       # → one prompt JSON document with prompts: string[]
 eq transcript <checkpoint-id> --session <n> --role <user|assistant|tool>   # → NDJSON of TranscriptEvent
 ```
 
@@ -103,7 +103,7 @@ Inline below are the four highest-frequency recipes. For others (cost aggregatio
 
 ```bash
 SHA=$(git blame -L <LINE>,<LINE> -- <FILE> | awk '{print $1}')
-CKPT=$(eq checkpoint --commit "$SHA" --json | jq -r .checkpoint_id)
+CKPT=$(eq checkpoint "$SHA" --json | jq -r .checkpoint_id)
 eq session list "$CKPT" | jq '{index, agent, prompt_preview, turn_count}'
 # pick the session whose prompt_preview matches the topic, then:
 eq prompt "$CKPT" --session <n>
@@ -133,16 +133,19 @@ git log --format='%H' <BASE>..<HEAD> \
   | xargs -n1 git show --format='%(trailers:key=Entire-Checkpoint,valueonly)' --no-patch \
   | sort -u | grep -v '^$' \
   | while read CKPT; do eq checkpoint "$CKPT" --json; done \
-  | jq -s '{
-      input:           map(.token_usage.input_tokens)          | add,
-      output:          map(.token_usage.output_tokens)         | add,
-      cache_creation:  map(.token_usage.cache_creation_tokens) | add,
-      cache_read:      map(.token_usage.cache_read_tokens)     | add,
-      api_calls:       map(.token_usage.api_call_count)        | add
-    }'
+  | jq -s '
+      def walk_tu: if . == null then empty else ., (.subagent_tokens | walk_tu) end;
+      [.[] | .token_usage | walk_tu] | {
+        input:           map(.input_tokens)          | add,
+        output:          map(.output_tokens)         | add,
+        cache_creation:  map(.cache_creation_tokens) | add,
+        cache_read:      map(.cache_read_tokens)     | add,
+        api_calls:       map(.api_call_count)        | add
+      }
+    '
 ```
 
-Report all five numbers. Do not invent a dollar figure unless the user gave you per-token rates.
+`walk_tokens` flattens any `subagent_tokens` nesting (Claude Code Task tool etc.) — without it you'll undercount whenever subagents ran. Report all five numbers. Do not invent a dollar figure unless the user gave you per-token rates.
 
 ### "Has skill X been firing on the right tasks?"
 
@@ -177,8 +180,9 @@ Report false negatives (matched the trigger but no skill call) explicitly — th
 - **`full.jsonl` contains noise rows** (`type: "file-history-snapshot"`, `type: "progress"`) that have no `role`. `eq transcript` normalizes them to `role: "unknown"`, `kind: "unknown"`. Filter with `--role` or `select(.role != "unknown")` — don't try to interpret them.
 - **`session_id` is not in checkpoint `metadata.json`**. It's only in each session's own `metadata.json`. `eq session list` already resolves this; if you're tempted to read `metadata.json` directly via `git show`, use `eq` instead.
 - **Paths in checkpoint metadata start with `/`** (e.g. `/04/c6b0cd0999/0/metadata.json`). `eq` strips the leading slash on output. If you ever see a leading `/` in `eq` output, that's a bug — report it, don't normalize silently.
-- **`turn_count` is derived**, not stored. It comes from `token_usage.api_call_count`. Do not present it as authoritative for "messages exchanged".
-- **Two agents, two transcript dialects.** Claude Code transcripts have `role` + `message.content[]`; Cursor transcripts may differ. The `raw` field of every event preserves the original — fall back to `raw` when `text` looks empty or wrong.
+- **`turn_count` resolution order**: `session_metrics.turn_count` (hook-reported by some agents like Cursor) → `token_usage.api_call_count` (fallback) → `null`. Prefer `session_metrics.turn_count` when both are present; treat `api_call_count` as an over-count of "messages exchanged" because streaming retries and parallel tool calls inflate it.
+- **Subagent token usage is nested.** When you sum tokens, walk `token_usage.subagent_tokens` recursively or you'll undercount Claude Code Task-tool work. The field is `null` when no subagents ran. Example: `[.token_usage, .token_usage.subagent_tokens // empty] | map(.input_tokens) | add`.
+- **Six agents, multiple transcript dialects.** Claude Code, Cursor, OpenCode, Codex, Copilot CLI, Gemini CLI, and Factory AI Droid each have their own `full.jsonl` shape (some are even single-JSON, not JSONL). `eq transcript` auto-detects the format and normalizes events to the common `role`/`kind`/`subtype`/`text`/`path` shape. The `raw` field always preserves the original source line/object — fall back to `raw` when `text` looks empty or wrong, and check `agent` from `eq session list`/`get` to know what agent-specific fields live in `raw`.
 - **`agent_percentage` is _initial_ attribution**, calculated when the session started. It does not reflect later edits. Don't quote it as the file's current AI ratio.
 - **Don't grep checkpoints directly with `git grep`** — the checkpoints branch is detached from the working tree. Use `eq` (which uses `git show`) or `git grep <pattern> entire/checkpoints/v1 -- <path>` explicitly.
 - **JSONL commands have no `--jsonl` flag.** `eq checkpoint list`, `eq session list`, and `eq transcript` always emit NDJSON. Don't pass `--json` to them — it's rejected. Use `| jq -s '.'` if you need an array.

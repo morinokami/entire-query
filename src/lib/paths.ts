@@ -2,8 +2,12 @@ import { fail } from "./errors.ts";
 
 const CHECKPOINT_ID_RE = /^[0-9a-f]{12}$/;
 
+export function isCheckpointId(s: string): boolean {
+  return CHECKPOINT_ID_RE.test(s);
+}
+
 export function assertCheckpointId(id: string): asserts id is string {
-  if (!CHECKPOINT_ID_RE.test(id)) {
+  if (!isCheckpointId(id)) {
     fail("invalid-arguments", `invalid checkpoint id: ${id}`, {
       hint: "Checkpoint ids are 12 lowercase hex characters",
     });

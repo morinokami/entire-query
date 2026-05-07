@@ -79,8 +79,9 @@ describe("claudecode parser", () => {
       subtype: "read",
       path: "src/foo.ts",
     });
-    expect(events[3]?.role).toBe("unknown");
-    expect((events[3]?.raw as { _parse_error?: string })._parse_error).toBeDefined();
+    const last = events[3];
+    expect(last?.role).toBe("unknown");
+    expect((last?.raw as { _parse_error?: string } | undefined)?._parse_error).toBeDefined();
   });
 });
 
@@ -275,4 +276,3 @@ describe("droid parser", () => {
     expect(tagged[1]?.path).toBe("src/foo.ts");
   });
 });
-
