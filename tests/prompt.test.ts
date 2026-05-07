@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
 import prompt from "../src/commands/prompt.ts";
 import { buildFixture, FIXTURE_CHECKPOINT_ID, type Fixture } from "./fixtures.ts";

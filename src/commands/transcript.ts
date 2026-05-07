@@ -1,6 +1,6 @@
 import { defineCommand } from "@rune-cli/rune";
 
-import { loadTranscript } from "../lib/transcript.ts";
+import { loadTranscript } from "../lib/transcript/index.ts";
 
 export default defineCommand({
   description: "Stream a session's transcript as normalized NDJSON events",
