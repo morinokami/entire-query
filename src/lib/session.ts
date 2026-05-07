@@ -2,10 +2,11 @@ import { loadCheckpointMetadata } from "./checkpoint.ts";
 import { fail } from "./errors.ts";
 import { GitNotFoundError, gitShowJSON, type RepoContext } from "./git.ts";
 import { assertCheckpointId, checkpointDir, stripLeadingSlash } from "./paths.ts";
-import { buildPromptPreview, loadPromptText } from "./prompt.ts";
+import { buildPromptPreview, loadPrompts } from "./prompt.ts";
 import {
   type InitialAttribution,
   type Session,
+  type SessionMetrics,
   type SessionSummary,
   type TokenUsage,
   ZERO_TOKEN_USAGE,
@@ -26,6 +27,7 @@ interface RawSessionMetadata {
   transcript_identifier_at_start?: string;
   token_usage?: Partial<TokenUsage>;
   initial_attribution?: Partial<InitialAttribution>;
+  session_metrics?: Partial<SessionMetrics>;
 }
 
 function normalizeTokenUsage(raw: Partial<TokenUsage> | undefined): TokenUsage {
@@ -36,6 +38,21 @@ function normalizeTokenUsage(raw: Partial<TokenUsage> | undefined): TokenUsage {
     cache_read_tokens: raw.cache_read_tokens ?? 0,
     output_tokens: raw.output_tokens ?? 0,
     api_call_count: raw.api_call_count ?? 0,
+  };
+}
+
+// Resolve session metrics from raw metadata, falling back to api_call_count
+// for turn_count when the agent doesn't report it via hooks. Other fields stay
+// null when absent — they have no meaningful fallback.
+function resolveSessionMetrics(
+  raw: Partial<SessionMetrics> | undefined,
+  apiCallCount: number,
+): SessionMetrics {
+  return {
+    turn_count: raw?.turn_count ?? (apiCallCount > 0 ? apiCallCount : null),
+    duration_ms: raw?.duration_ms ?? null,
+    context_tokens: raw?.context_tokens ?? null,
+    context_window_size: raw?.context_window_size ?? null,
   };
 }
 
@@ -121,18 +138,19 @@ export async function loadSessionList(
     const meta = await readSessionMetadata(repo, ref.metadataPath);
     const filesTouched = meta?.files_touched ?? [];
     if (opts.file && !filesTouched.includes(opts.file)) continue;
-    const prompt = await loadPromptText(repo, id, ref.index);
+    const prompts = await loadPrompts(repo, id, ref.index);
     const tokenUsage = normalizeTokenUsage(meta?.token_usage);
+    const metrics = resolveSessionMetrics(meta?.session_metrics, tokenUsage.api_call_count);
     out.push({
       index: ref.index,
       session_id: meta?.session_id ?? null,
       agent: meta?.agent ?? null,
       model: meta?.model ?? null,
       created_at: meta?.created_at ?? null,
-      turn_count: tokenUsage.api_call_count || null,
+      turn_count: metrics.turn_count,
       path: `${checkpointDir(id)}/${ref.index}`,
       files_touched: filesTouched,
-      prompt_preview: buildPromptPreview(prompt),
+      prompt_preview: buildPromptPreview(prompts?.[0] ?? null),
     });
   }
   return out;
@@ -168,7 +186,7 @@ export async function loadSession(repo: RepoContext, id: string, index: number):
     model: meta.model ?? null,
     turn_id: meta.turn_id ?? null,
     transcript_identifier_at_start: meta.transcript_identifier_at_start ?? null,
-    session_metrics: { turn_count: tokenUsage.api_call_count || null },
+    session_metrics: resolveSessionMetrics(meta.session_metrics, tokenUsage.api_call_count),
     token_usage: tokenUsage,
     initial_attribution: normalizeAttribution(meta.initial_attribution),
     files: {
