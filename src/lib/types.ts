@@ -35,6 +35,13 @@ export interface Checkpoint {
   token_usage: TokenUsage;
 }
 
+export interface SessionMetrics {
+  turn_count: number | null;
+  duration_ms: number | null;
+  context_tokens: number | null;
+  context_window_size: number | null;
+}
+
 export interface SessionSummary {
   index: number;
   session_id: string | null;
@@ -61,7 +68,7 @@ export interface Session {
   model: string | null;
   turn_id: string | null;
   transcript_identifier_at_start: string | null;
-  session_metrics: { turn_count: number | null };
+  session_metrics: SessionMetrics;
   token_usage: TokenUsage;
   initial_attribution: InitialAttribution | null;
   files: {
@@ -77,7 +84,7 @@ export interface PromptResult {
   checkpoint_id: string;
   session_index: number;
   session_id: string | null;
-  prompt: string | null;
+  prompts: string[] | null;
 }
 
 export type Role = "user" | "assistant" | "tool" | "unknown";

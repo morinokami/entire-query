@@ -87,6 +87,12 @@ export function buildFixture(): Fixture {
         output_tokens: 40,
         api_call_count: 4,
       },
+      session_metrics: {
+        turn_count: 7,
+        duration_ms: 142340,
+        context_tokens: 87521,
+        context_window_size: 200000,
+      },
       initial_attribution: {
         calculated_at: "2026-01-01T00:00:00Z",
         agent_lines: 50,
@@ -98,7 +104,10 @@ export function buildFixture(): Fixture {
       },
     }),
   );
-  writeFileSync(join(cpDir, "0", "prompt.txt"), "Please review src/foo.ts thoroughly.");
+  writeFileSync(
+    join(cpDir, "0", "prompt.txt"),
+    "Please review src/foo.ts thoroughly.\n\n---\n\nAlso add a unit test for it.",
+  );
   writeFileSync(join(cpDir, "0", "context.md"), "ctx\n");
   writeFileSync(join(cpDir, "0", "content_hash.txt"), "hash0\n");
   const transcript0 = [

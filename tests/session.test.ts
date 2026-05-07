@@ -32,14 +32,18 @@ describe("eq session list", () => {
       index: 0,
       session_id: "11111111-1111-1111-1111-111111111111",
       agent: "Claude Code",
-      turn_count: 4,
+      turn_count: 7,
       path: "04/aaaaaaaaaa/0",
       files_touched: ["src/foo.ts"],
     });
-    expect((s0 as { prompt_preview: string }).prompt_preview).toMatch(/Please review src\/foo\.ts/);
+    const preview = (s0 as { prompt_preview: string }).prompt_preview;
+    expect(preview).toMatch(/Please review src\/foo\.ts/);
+    expect(preview).not.toContain("---");
+    expect(preview).not.toContain("Also add a unit test");
     expect(s1).toMatchObject({
       index: 1,
       agent: "Cursor",
+      turn_count: 2,
       prompt_preview: null,
     });
   });
@@ -83,7 +87,12 @@ describe("eq session get", () => {
         session_id: "11111111-1111-1111-1111-111111111111",
         agent: "Claude Code",
         turn_id: "turn0",
-        session_metrics: { turn_count: 4 },
+        session_metrics: {
+          turn_count: 7,
+          duration_ms: 142340,
+          context_tokens: 87521,
+          context_window_size: 200000,
+        },
         initial_attribution: { agent_lines: 50, agent_percentage: 80 },
         files: {
           metadata: "04/aaaaaaaaaa/0/metadata.json",
@@ -100,6 +109,23 @@ describe("eq session get", () => {
     for (const v of Object.values(data.files)) {
       if (v) expect(v.startsWith("/")).toBe(false);
     }
+  });
+
+  test("session_metrics falls back to api_call_count when not reported", async () => {
+    const r = await runEq(sessionGet, [FIXTURE_CHECKPOINT_ID, "--index", "1", "--repo", fx.root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.output).toMatchObject({
+      kind: "json",
+      document: {
+        index: 1,
+        session_metrics: {
+          turn_count: 2,
+          duration_ms: null,
+          context_tokens: null,
+          context_window_size: null,
+        },
+      },
+    });
   });
 
   test("missing index → session/not-found", async () => {
