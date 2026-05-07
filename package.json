@@ -2,7 +2,16 @@
   "name": "entire-query",
   "version": "0.1.1",
   "description": "Entire Query — fetch Entire AI session history as JSON/JSONL",
+  "homepage": "https://github.com/morinokami/entire-query#readme",
+  "bugs": {
+    "url": "https://github.com/morinokami/entire-query/issues"
+  },
   "license": "MIT",
+  "author": "Shinya Fujino <shf0811@gmail.com> (https://github.com/morinokami)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/morinokami/entire-query.git"
+  },
   "bin": {
     "eq": "dist/cli.mjs"
   },
