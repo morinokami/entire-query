@@ -93,7 +93,7 @@ eq prompt <checkpoint-id> --session <n>       # → one prompt JSON document wit
 eq transcript <checkpoint-id> --session <n> --role <user|assistant|tool>   # → NDJSON of TranscriptEvent
 ```
 
-Every command supports `--repo <path>` (defaults to cwd). JSON commands also accept `--json` (auto-enabled under agents) for compact output. Errors come back as `{"error":{"kind":"...","message":"...","hint":"..."}}` on stderr with non-zero exit; check `kind` (e.g. `checkpoint/not-found`) before retrying.
+Every command supports `--repo <path>` (defaults to cwd). JSON commands also accept `--json` (auto-enabled under agents) for compact output. Errors come back as `{"error":{"kind":"...","message":"...","hint":"..."}}` on **stderr** with non-zero exit (both JSON and JSONL modes). Check `kind` (e.g. `checkpoint/not-found`) before retrying.
 
 ## Recipes by question type
 

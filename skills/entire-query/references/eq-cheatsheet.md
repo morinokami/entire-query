@@ -6,7 +6,7 @@ Reference for the `eq` CLI. The npm package is `entire-query`. **Default invocat
 
 - `--repo <path>` — target Git repo (default: cwd; resolved to repo root)
 - `--json` (single-document commands only) — emit compact one-line JSON to stdout (auto-enabled under AI agents). Rejected on JSONL commands (`checkpoint list`, `session list`, `transcript`)
-- All commands return non-zero with `{"error":{"kind":"...","message":"...","hint":"..."}}` on stderr on failure
+- All commands return non-zero on failure with `{"error":{"kind":"...","message":"...","hint":"..."}}` on **stderr** (both JSON and JSONL modes). `2>/dev/null` suppresses error output as expected; check exit code to detect failure.
 
 ## Output modes
 
