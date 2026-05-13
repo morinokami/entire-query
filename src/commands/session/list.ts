@@ -5,7 +5,14 @@ import { loadSessionList } from "../../lib/session.ts";
 export default defineCommand({
   description: "Stream sessions in a checkpoint as NDJSON",
   jsonl: true,
-  args: [{ name: "id", type: "string", required: true }],
+  args: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Checkpoint id",
+    },
+  ],
   options: [
     {
       name: "file",

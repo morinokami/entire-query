@@ -9,7 +9,14 @@ import { findSessionId } from "../lib/session.ts";
 export default defineCommand({
   description: "Fetch a session's prompts (split on the Entire turn separator)",
   json: true,
-  args: [{ name: "id", type: "string", required: true }],
+  args: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Checkpoint id containing the session",
+    },
+  ],
   options: [
     {
       name: "session",

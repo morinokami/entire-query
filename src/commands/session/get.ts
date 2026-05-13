@@ -5,7 +5,14 @@ import { loadSession } from "../../lib/session.ts";
 export default defineCommand({
   description: "Get a single session's full metadata",
   json: true,
-  args: [{ name: "id", type: "string", required: true }],
+  args: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Checkpoint id",
+    },
+  ],
   options: [
     {
       name: "index",

@@ -28,4 +28,4 @@ All commands accept `--repo <path>` (default: cwd). JSON commands auto-emit comp
 
 ## Why
 
-`entire explain` returns AI-summarized prose. `eq` returns raw structured data so callers (skills, agents, scripts) can quote, aggregate, and cross-reference primary sources. Aggregation is delegated to `jq`.
+`entire explain` is a human-readable CLI view: it can show a stored AI summary, and `entire explain --generate` creates one, but the default view also renders metadata, prompts, and parsed transcript excerpts directly. `eq` returns raw structured data so callers (skills, agents, scripts) can quote, aggregate, and cross-reference primary sources. Aggregation is delegated to `jq`.

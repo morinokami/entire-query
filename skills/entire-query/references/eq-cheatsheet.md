@@ -1,6 +1,6 @@
 # eq cheatsheet
 
-Reference for the `eq` CLI. The npm package is `entire-query`. **Default invocation is `npx -y entire-query …`** (no install required). Examples below write `eq …` for brevity; substitute `npx -y entire-query` (or `$EQ` after the detection block in `SKILL.md`) when running. Global install (`npm i -g entire-query`) is optional for users who run `eq` repeatedly — never required by the skill.
+Reference for the `eq` CLI. The npm package is `entire-query`. **Default invocation is `npx -y entire-query …`** for one-off or small lookups (no install required). Examples below write `eq …` for brevity; substitute `npx -y entire-query` (or `$EQ` after the detection block in `SKILL.md`) when running. For bulk workflows, avoid putting `npx -y entire-query` inside per-checkpoint loops; use an already-installed or once-cached `eq` binary instead. Global install (`npm i -g entire-query`) is optional for users who run `eq` repeatedly — never required by the skill.
 
 ## Global
 
