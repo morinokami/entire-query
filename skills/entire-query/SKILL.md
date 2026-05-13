@@ -5,7 +5,7 @@ description: Query a repository's AI session history (Entire checkpoints, sessio
 
 # entire-query
 
-Tools and procedures for answering questions about a repository's AI session history. The repository stores Entire checkpoints on the `entire/checkpoints/v1` branch and links them to commits via an `Entire-Checkpoint: <id>` Git trailer. The `eq` CLI exposes that data as stable JSON / JSONL so you can compose answers with `jq`.
+Tools and procedures for answering questions about a repository's AI session history. Entire records AI work as checkpoints linked to commits via an `Entire-Checkpoint: <id>` Git trailer. The official `entire` CLI is the human-facing entry point for search, explanation, rewind, resume, and v2-aware checkpoint reads. The `eq` CLI complements it by exposing checkpoint data as stable JSON / JSONL so you can verify, cite, aggregate, and audit with `jq`.
 
 ## Invoking `eq`
 
@@ -38,26 +38,37 @@ Do **not** activate when:
 - The user asks how the current code works ("explain this function") — read the code instead
 - The user asks about future plans or design proposals
 - The question is a pure Git operation ("what commits are on this branch") that doesn't need session content
-- The repo doesn't use Entire (no `entire/checkpoints/v1` ref → fall back to honest "no AI history available")
+- The repo doesn't use Entire (no checkpoint refs → fall back to honest "no AI history available")
 
 Run this preflight before doing anything else:
 
 ```bash
-git rev-parse --verify entire/checkpoints/v1 >/dev/null 2>&1 || echo "no entire history"
+if git rev-parse --verify entire/checkpoints/v1 >/dev/null 2>&1 ||
+   git rev-parse --verify refs/remotes/origin/entire/checkpoints/v1 >/dev/null 2>&1; then
+  echo "eq-readable entire history"
+elif git rev-parse --verify refs/entire/checkpoints/v2/main >/dev/null 2>&1; then
+  echo "entire v2 history only"
+else
+  echo "no entire history"
+fi
 ```
 
-If that prints "no entire history", say so and stop. Do not fabricate.
+If that prints "no entire history", say so and stop. Do not fabricate. If it prints "entire v2 history only", prefer the official `entire` CLI; `eq` currently reads `entire/checkpoints/v1`.
 
-## Why `eq` and not `entire explain`
+## How `eq` complements `entire`
 
-`entire explain` is optimized for human-readable CLI output. It may show a stored AI summary, and `entire explain --generate` creates one, but the default view also renders metadata, prompts, and parsed transcript excerpts directly. That output is formatted for reading, not for stable structured querying. Use `eq` for everything in this skill — it returns raw structured data so **you** do the reasoning and cite specific sessions. Only fall back to `entire explain --raw-transcript` if `eq` itself is unavailable.
+Use the official `entire` CLI for human-facing workflows: broad semantic search, quick checkpoint overviews, generated summaries, rewind/resume/attach flows, and v2-aware checkpoint data.
+
+Use `eq` when the answer must be reproducible, scriptable, grounded in primary transcript events, or aggregated across many sessions. `eq` is the right tool for stable JSON/JSONL, `jq` filters, token totals, skill/tool audits, and citations that name `checkpoint_id`, `session_id`, and `event_index`.
+
+Treat `entire explain` as a useful lead or overview, not as the final source for evidence-heavy answers. It may show a stored AI summary, `entire explain --generate` creates one, and the default view also renders metadata, prompts, and parsed transcript excerpts directly. That output is formatted for reading, not for stable structured querying. If `entire explain` finds the likely checkpoint or gives a helpful summary, verify important claims with `eq prompt`, `eq session get`, or `eq transcript` before quoting or auditing.
 
 ## Core workflow (universal)
 
 Every question follows this shape. Skip steps that are irrelevant.
 
 1. **Anchor**: turn the user's question into one of `commit SHA`, `file path`, `file:line`, or free text
-2. **Resolve to checkpoint(s)**: use `eq checkpoint <sha>` (best — accepts any git ref), or `eq checkpoint list --file <path>` (file-anchored), or `eq checkpoint list` + filter (free text)
+2. **Resolve to checkpoint(s)**: use `eq checkpoint <sha>` (best for commits — accepts any git ref), `eq checkpoint list --file <path>` (file-anchored), or `entire checkpoint search "<query>" --json` when starting from broad free text and the official CLI is available
 3. **Triage sessions cheaply**: `eq session list <id>` returns `agent`, `created_at`, `turn_count`, `prompt_preview`, `files_touched`. Pick the smallest plausible set before opening any transcript
 4. **Read prompt before transcript**: `eq prompt <id> --session <n>` is one short file. Often it answers the question on its own
 5. **Open transcripts last** and filtered: `eq transcript <id> --session <n> --role user|assistant|tool` (NDJSON, pipe to `jq` for analytics)
@@ -71,10 +82,12 @@ Every question follows this shape. Skip steps that are irrelevant.
 | ---------------------------------- | ------------------------------------------------------------------------------------- |
 | commit SHA / `git blame` mentions  | `eq checkpoint <sha>`                                                                 |
 | file path / `path:line`            | `eq checkpoint list --file <path>` then triage by `created_at`                        |
-| feature name, free text            | `eq checkpoint list \| jq 'select(.files_touched[] \| contains("..."))'`              |
+| feature name, free text            | `entire checkpoint search "<query>" --json` for leads, then verify with `eq`          |
 | "PR" / "this branch"               | `git log --grep='Entire-Checkpoint:' <range>` → trailer → `eq checkpoint <sha>`       |
 | Token / cost question              | Anchor as above, then aggregate via `\| jq -s` (see [recipes](references/recipes.md)) |
 | "Did skill X fire?" / "Bash audit" | Anchor → `eq transcript ... \| jq` filter (see [recipes](references/recipes.md))      |
+
+If `entire checkpoint search` is unavailable, unauthenticated, or too broad, fall back to `eq checkpoint list` plus `jq` filters over `files_touched`, `created_at`, `agent`, and prompt previews from `eq session list`.
 
 ## Output modes (important)
 
@@ -188,7 +201,8 @@ Report false negatives (matched the trigger but no skill call) explicitly — th
 - **`agent_percentage` is _initial_ attribution**, calculated when the session started. It does not reflect later edits. Don't quote it as the file's current AI ratio.
 - **Don't grep checkpoints directly with `git grep`** — the checkpoints branch is detached from the working tree. Use `eq` (which uses `git show`) or `git grep <pattern> entire/checkpoints/v1 -- <path>` explicitly.
 - **JSONL commands have no `--jsonl` flag.** `eq checkpoint list`, `eq session list`, and `eq transcript` always emit NDJSON. Don't pass `--json` to them — it's rejected. Use `| jq -s '.'` if you need an array.
-- **`entire explain` is a human view, not a source API.** Its stored/generated summaries are interpretive, and its transcript display is formatted prose. Reach for it only as a last resort and label its output as such.
+- **`entire explain` is an overview, not a primary-source citation.** Use it to find likely checkpoints or understand the shape of a session. For claims that need evidence, come back to `eq` and cite the underlying prompt, metadata, or transcript event.
+- **`eq` currently reads `entire/checkpoints/v1`.** If the repo is configured for checkpoints v2 only (`refs/entire/checkpoints/v2/main`), use the official `entire` CLI for checkpoint reads.
 - **Build localized regexes from the user's language.** When the user asks in a non-English language, the prompts and transcripts may also be in that language. Add the relevant translations to any `test(...; "i")` filter rather than relying on English alone.
 
 ## When to load reference files

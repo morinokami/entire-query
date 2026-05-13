@@ -2,6 +2,8 @@
 
 `eq` — fetch [Entire](https://entire.io/) AI session history from a Git repo as stable JSON / JSONL. Like `jq` for Entire checkpoints.
 
+`eq` complements the official `entire` CLI. Use `entire` for human-facing workflows such as setup, semantic search, quick explanations, summaries, rewind, and resume. Use `eq` when you need reproducible structured output for agents, scripts, citations, token aggregation, or transcript audits.
+
 The npm package is `entire-query`; the binary is `eq`.
 
 ## Run
@@ -15,8 +17,7 @@ No install required. Optional global install: `npm i -g entire-query`.
 ## Commands
 
 ```bash
-eq checkpoint <id>                          # one Checkpoint JSON
-eq checkpoint --commit <sha>                # resolve via Entire-Checkpoint trailer
+eq checkpoint <id-or-ref>                   # one Checkpoint JSON; git refs resolve via Entire-Checkpoint trailer
 eq checkpoint list [--file <path>]          # NDJSON stream
 eq session list <id> [--file <path>]        # NDJSON of SessionSummary (with prompt_preview)
 eq session get <id> --index <n>             # one Session JSON
@@ -28,4 +29,6 @@ All commands accept `--repo <path>` (default: cwd). JSON commands auto-emit comp
 
 ## Why
 
-`entire explain` is a human-readable CLI view: it can show a stored AI summary, and `entire explain --generate` creates one, but the default view also renders metadata, prompts, and parsed transcript excerpts directly. `eq` returns raw structured data so callers (skills, agents, scripts) can quote, aggregate, and cross-reference primary sources. Aggregation is delegated to `jq`.
+`entire explain` is useful for getting oriented and finding likely checkpoints. It is a human-readable CLI view: it can show a stored AI summary, `entire explain --generate` creates one, and the default view also renders metadata, prompts, and parsed transcript excerpts directly. `eq` is for the next step: reading the underlying checkpoint data as raw structured output so callers can quote, aggregate, audit, and cross-reference primary sources. Aggregation is delegated to `jq`.
+
+`eq` currently reads the `entire/checkpoints/v1` branch. For checkpoints v2-only repositories or workflows that need remote fetch, generated summaries, rewind, or resume, use the official `entire` CLI.
