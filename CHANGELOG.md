@@ -1,5 +1,11 @@
 # entire-query
 
+## 0.1.4
+
+### Patch Changes
+
+- [#10](https://github.com/morinokami/entire-query/pull/10) [`0c75774`](https://github.com/morinokami/entire-query/commit/0c75774a458cae6ba48fb6fcb0a430c6ae3ac668) Thanks [@morinokami](https://github.com/morinokami)! - docs: clarify how eq complements entire CLI
+
 ## 0.1.3
 
 ### Patch Changes
