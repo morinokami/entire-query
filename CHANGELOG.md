@@ -1,5 +1,11 @@
 # entire-query
 
+## 0.1.3
+
+### Patch Changes
+
+- [#8](https://github.com/morinokami/entire-query/pull/8) [`c35595c`](https://github.com/morinokami/entire-query/commit/c35595ccf28e700f6f97f4161805f03d0f964a7f) Thanks [@morinokami](https://github.com/morinokami)! - docs(commands): describe positional arguments in help
+
 ## 0.1.2
 
 ### Patch Changes
