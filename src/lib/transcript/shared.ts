@@ -34,21 +34,6 @@ export function buildEvent(
   };
 }
 
-export function unknownEvent(
-  ctx: EventContext,
-  event_index: number,
-  raw: unknown,
-): TranscriptEvent {
-  return buildEvent(ctx, event_index, {
-    role: "unknown",
-    kind: "unknown",
-    subtype: "unknown",
-    text: "",
-    path: null,
-    raw,
-  });
-}
-
 export function parseErrorEvent(
   ctx: EventContext,
   event_index: number,
@@ -98,7 +83,7 @@ export function stripIDEContextTags(text: string): string {
 
 const SAFE_PATH_RE = /^[\w./@:-]+$/;
 
-export function safePath(s: string): string | null {
+function safePath(s: string): string | null {
   return s.length > 0 && SAFE_PATH_RE.test(s) ? s : null;
 }
 

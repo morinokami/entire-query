@@ -107,7 +107,7 @@ export interface TranscriptEvent {
   raw: unknown;
 }
 
-export const ZERO_TOKEN_USAGE: TokenUsage = {
+const ZERO_TOKEN_USAGE: TokenUsage = {
   input_tokens: 0,
   cache_creation_tokens: 0,
   cache_read_tokens: 0,

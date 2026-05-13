@@ -10,10 +10,10 @@
 
 ## Commands
 
-- `pnpm start <subcommand> [...args]` — run CLI without building (e.g. `pnpm start checkpoint <id>`).
-- `pnpm build` — `rune build` → `dist/cli.mjs` (npm bin entry).
-- `pnpm test` — full vitest run. Prefer single-file: `pnpm test tests/session.test.ts`.
-- `pnpm rune sync` — regenerate Rune types after adding/renaming commands.
+- `vp run start <subcommand> [...args]` — run CLI without building (e.g. `vp run start checkpoint <id>`).
+- `vp run build` — `rune build` → `dist/cli.mjs` (npm bin entry).
+- `vp run test` — full vitest run. Prefer single-file: `vp run test tests/session.test.ts`.
+- `vp run rune sync` — regenerate Rune types after adding/renaming commands.
 
 ## Architecture rules
 
