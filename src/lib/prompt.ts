@@ -6,7 +6,7 @@ const PROMPT_SEPARATOR = "\n\n---\n\n";
 // Entire writes one prompt.txt per session that may accumulate multiple
 // prompts across turns, joined by `\n\n---\n\n`. Mirrors splitPromptContent
 // in cli-main/cmd/entire/cli/strategy/manual_commit_condensation.go.
-export function splitPrompts(text: string): string[] {
+function splitPrompts(text: string): string[] {
   if (text.length === 0) return [];
   return text
     .split(PROMPT_SEPARATOR)

@@ -21,10 +21,3 @@ export function checkpointDir(id: string): string {
 export function stripLeadingSlash(p: string): string {
   return p.replace(/^\/+/, "");
 }
-
-export function joinBranchPath(...parts: string[]): string {
-  return parts
-    .map((p) => stripLeadingSlash(p))
-    .filter((p) => p.length > 0)
-    .join("/");
-}

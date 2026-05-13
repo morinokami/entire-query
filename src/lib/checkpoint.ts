@@ -84,7 +84,7 @@ export async function loadCheckpoint(repo: RepoContext, id: string): Promise<Che
   };
 }
 
-export async function* iterateCheckpointIds(repo: RepoContext): AsyncGenerator<string> {
+async function* iterateCheckpointIds(repo: RepoContext): AsyncGenerator<string> {
   const shards = await gitLsTreeDirs(repo, "");
   for (const shard of shards) {
     if (!/^[0-9a-f]{2}$/.test(shard)) continue;
