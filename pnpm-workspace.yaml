@@ -3,7 +3,7 @@ catalog:
   "@changesets/cli": 2.31.0
   "@rune-cli/rune": 0.3.2
   "@types/node": 24.12.4
-  "@typescript/native-preview": 7.0.0-dev.20260506.1
+  "@typescript/native-preview": 7.0.0-dev.20260513.1
   typescript: 6.0.3
   vite: 8.0.12
   vite-plus: 0.1.21
