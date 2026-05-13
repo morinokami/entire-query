@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile
 
+      - name: Generate Rune types
+        run: vp run rune sync
+
       - name: Run Vite+ check
         run: vp check src
 
