@@ -15,7 +15,7 @@ The CLI binary is `eq`; the npm package is `entire-query`. **No installation req
 npx -y entire-query <subcommand> [args...]
 ```
 
-The first call fetches the package over the network (a few seconds) and caches it; subsequent calls within the npm cache window are fast. This is the path you should default to — never ask the user to globally install anything just to use this skill.
+The first call fetches the package over the network (a few seconds) and caches it. Later `npx` calls reuse the package cache, but still pay npm/npx startup overhead. This is the path you should default to for one-off or small lookups — never ask the user to globally install anything just to use this skill.
 
 Optional: if `eq` is already on `PATH` (the user has done `npm i -g entire-query` / `pnpm add -g entire-query` / `bun add -g entire-query` themselves), use it directly. Detect at runtime and pick the shorter form:
 
@@ -24,6 +24,8 @@ command -v eq >/dev/null 2>&1 && EQ="eq" || EQ="npx -y entire-query"
 ```
 
 Then prefix invocations with `$EQ` (e.g. `$EQ checkpoint <sha>`). Examples below write `eq …` for brevity — substitute `$EQ` (or `npx -y entire-query` directly) in your actual commands. **Do not run a bare `eq …` without first verifying that `command -v eq` succeeds**; on a fresh machine it will fail with `command not found` and you'll have to redo the call with `npx -y entire-query …`.
+
+For bulk workflows, do **not** put `npx -y entire-query` inside a per-checkpoint or per-session loop. If many `eq` calls are needed, prefer an already-installed `eq` on `PATH`, or install/cache `entire-query` once into a temporary or tool-local prefix and invoke that `eq` binary directly for the rest of the workflow. Keep `npx -y entire-query` as the default for one-off or small numbers of calls.
 
 Pitfall: `npx eq` (without `entire-query`) fetches an unrelated package of the same name. The package name is **always** `entire-query`.
 
@@ -48,7 +50,7 @@ If that prints "no entire history", say so and stop. Do not fabricate.
 
 ## Why `eq` and not `entire explain`
 
-`entire explain` returns an AI-summarized text answer. That hides the primary sources from you and prevents quoting / cross-referencing. Use `eq` for everything in this skill — it returns raw structured data so **you** do the reasoning and cite specific sessions. Only fall back to `entire explain --raw-transcript` if `eq` itself is unavailable.
+`entire explain` is optimized for human-readable CLI output. It may show a stored AI summary, and `entire explain --generate` creates one, but the default view also renders metadata, prompts, and parsed transcript excerpts directly. That output is formatted for reading, not for stable structured querying. Use `eq` for everything in this skill — it returns raw structured data so **you** do the reasoning and cite specific sessions. Only fall back to `entire explain --raw-transcript` if `eq` itself is unavailable.
 
 ## Core workflow (universal)
 
@@ -186,7 +188,7 @@ Report false negatives (matched the trigger but no skill call) explicitly — th
 - **`agent_percentage` is _initial_ attribution**, calculated when the session started. It does not reflect later edits. Don't quote it as the file's current AI ratio.
 - **Don't grep checkpoints directly with `git grep`** — the checkpoints branch is detached from the working tree. Use `eq` (which uses `git show`) or `git grep <pattern> entire/checkpoints/v1 -- <path>` explicitly.
 - **JSONL commands have no `--jsonl` flag.** `eq checkpoint list`, `eq session list`, and `eq transcript` always emit NDJSON. Don't pass `--json` to them — it's rejected. Use `| jq -s '.'` if you need an array.
-- **`entire explain` is not your friend here.** Its summary is opinionated and uncitable. Reach for it only as a last resort and label its output as such.
+- **`entire explain` is a human view, not a source API.** Its stored/generated summaries are interpretive, and its transcript display is formatted prose. Reach for it only as a last resort and label its output as such.
 - **Build localized regexes from the user's language.** When the user asks in a non-English language, the prompts and transcripts may also be in that language. Add the relevant translations to any `test(...; "i")` filter rather than relying on English alone.
 
 ## When to load reference files

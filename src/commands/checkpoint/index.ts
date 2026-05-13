@@ -9,7 +9,14 @@ export default defineCommand({
   description:
     "Fetch checkpoint metadata as JSON. Accepts either a 12-hex checkpoint id or any commit ref (HEAD, sha, branch) — commits are resolved via the Entire-Checkpoint trailer.",
   json: true,
-  args: [{ name: "ref", type: "string", required: true }],
+  args: [
+    {
+      name: "ref",
+      type: "string",
+      required: true,
+      description: "Checkpoint id or git ref resolved via the Entire-Checkpoint trailer",
+    },
+  ],
   async run({ args, output, locals }) {
     let id: string;
     if (isCheckpointId(args.ref)) {

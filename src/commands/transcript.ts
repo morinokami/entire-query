@@ -5,7 +5,14 @@ import { loadTranscript } from "../lib/transcript/index.ts";
 export default defineCommand({
   description: "Stream a session's transcript as normalized NDJSON events",
   jsonl: true,
-  args: [{ name: "id", type: "string", required: true }],
+  args: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Checkpoint id containing the session",
+    },
+  ],
   options: [
     {
       name: "session",
