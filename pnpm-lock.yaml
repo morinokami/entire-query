@@ -13,8 +13,8 @@ catalogs:
       specifier: 2.31.0
       version: 2.31.0
     '@rune-cli/rune':
-      specifier: 0.3.2
-      version: 0.3.2
+      specifier: 0.3.3
+      version: 0.3.3
     '@types/node':
       specifier: 24.12.4
       version: 24.12.4
@@ -43,7 +43,7 @@ importers:
         version: 2.31.0(@types/node@24.12.4)
       '@rune-cli/rune':
         specifier: 'catalog:'
-        version: 0.3.2
+        version: 0.3.3
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -779,8 +779,8 @@ packages:
   '@rolldown/pluginutils@1.0.0-rc.18':
     resolution: {integrity: sha512-CUY5Mnhe64xQBGZEEXQ5WyZwsc1JU3vAZLIxtrsBt3LO6UOb+C8GunVKqe9sT8NeWb4lqSaoJtp2xo6GxT1MNw==}
 
-  '@rune-cli/rune@0.3.2':
-    resolution: {integrity: sha512-cW6o4LWmnBPXUScbOsgcbcLTwC+R4beEnDCpHWNDirjzSOd934QBwFlS2FsmdoIc2BrFfZVEaGZSf8s2eInFGA==}
+  '@rune-cli/rune@0.3.3':
+    resolution: {integrity: sha512-e9oUopPvUn3bmIKcoD/A+MEVEo4fmwBOm0lldRJWdojijV2NZ9CNfVLed8gq7oZhOvN528+IWmIQktYQhqgWsA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
@@ -2091,7 +2091,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.0-rc.18': {}
 
-  '@rune-cli/rune@0.3.2':
+  '@rune-cli/rune@0.3.3':
     dependencies:
       oxc-parser: 0.129.0
       rolldown: 1.0.0-rc.18
