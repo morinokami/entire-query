@@ -8,9 +8,9 @@ The npm package is `entire-query`; the binary is `eq`.
 
 ## Agent and skill use
 
-`eq` is designed primarily as an agent-facing tool, especially when paired with skills, prompts, or other reusable agent instructions. Humans can run it directly, but its main job is to give agents stable, scriptable access to Entire checkpoint data without relying on human-oriented terminal views.
+`eq` is designed for direct use by agent coding tools such as Claude Code and Codex, especially through companion skills. Install the skill in your agent environment, then ask plain questions like "What did we decide about error handling last time?", "Find the exact wording behind the earlier decision about this file", or "Which past exchange used the most tokens?" The skill can call `eq` behind the scenes and ground its answer in stable JSON/JSONL checkpoint data.
 
-To install the companion skill for an agent environment:
+Install the companion skill:
 
 ```bash
 npx skills add morinokami/entire-query
@@ -18,7 +18,7 @@ npx skills add morinokami/entire-query
 
 A typical skill should call `eq` to retrieve primary session data, then do any summarization, comparison, citation, or filtering in the agent layer. Prefer `eq` over `entire explain` when the agent needs deterministic JSON/JSONL, exact prompts, transcript events, token usage, or checkpoint metadata.
 
-## Run
+## Manual run
 
 ```bash
 npx -y entire-query <subcommand> [...args]
