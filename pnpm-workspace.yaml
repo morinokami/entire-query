@@ -6,4 +6,4 @@ catalog:
   "@typescript/native-preview": 7.0.0-dev.20260521.1
   knip: 6.14.1
   typescript: 6.0.3
-  vite-plus: 0.1.22
+  vite-plus: 0.2.3
